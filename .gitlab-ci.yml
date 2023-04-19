@@ -1,0 +1,26 @@
+stages:
+  - run_tests
+ 
+run_tests:
+  stage: run_tests
+  image: alpinelinux/docker-cli
+  variables:
+    CYPRESS_IMAGE: registry.gitlab.com/my-team/cypress/cypress-baseimage:latest
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - export CONTAINER_ID=$(docker ps -q -f "label=com.gitlab.gitlab-runner.job.id=$CI_JOB_ID" -f "label=com.gitlab.gitlab-runner.type=build")
+    - pwd
+    - ls
+    # you can't mount a volume inside a docker for another subdocker, it will mount the host,
+    # using --volumes-from and identifying the running docker container will allow us to mount the docker's volume for the subdocker container
+    - docker run --volumes-from $CONTAINER_ID -v $PWD:/e2e $CYPRESS_IMAGE cypress run --config-file /e2e/cypress.json --spec /e2e/test.js
+    - mv cypress/videos/bot-$BOT_ID.js.mp4 cypress/videos/bot-$BOT_ID-$(date +'%Y%m%d-%H%M%S').mp4  
+  artifacts:
+    when: always
+    paths:
+      - cypress/videos/**/*.mp4
+      - cypress/screenshots/**/*.png
+    expire_in: 7 days
+  retry: 1
+
+
