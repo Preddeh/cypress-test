@@ -20,7 +20,7 @@ run_tests:
     - export CONTAINER_ID=$(docker ps -q -f "label=com.gitlab.gitlab-runner.job.id=$CI_JOB_ID" -f "label=com.gitlab.gitlab-runner.type=build")
     # you can't mount a volume inside a docker for another subdocker, it will mount the host,
     # using --volumes-from and identifying the running docker container will allow us to mount the docker's volume for the subdocker container
-    - docker run --mount type=bind,source=$(pwd)/videos,target=/app/videos $CYPRESS_IMAGE --config-file cypress.config.js --spec bot-$BOT_ID.js
+    - docker run --volumes-from $CONTAINER_ID $CYPRESS_IMAGE --config-file cypress.config.js --spec bot-$BOT_ID.js
   artifacts:
     when: always
     paths:
