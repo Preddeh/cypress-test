@@ -1,26 +1,29 @@
 stages:
-  - run_tests
- 
-run_tests:
-  stage: run_tests
+  - build_&_test
+variables:
+  BOT_ID: ""
+  CYPRESS_IMAGE: registry.gitlab.com/my-team/project/cypress:$CI_COMMIT_SHA 
+
+.build_docker:
+  stage: build_&_test
   image: alpinelinux/docker-cli
-  variables:
-    CYPRESS_IMAGE: registry.gitlab.com/my-team/cypress/cypress-baseimage:latest
-  script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - export CONTAINER_ID=$(docker ps -q -f "label=com.gitlab.gitlab-runner.job.id=$CI_JOB_ID" -f "label=com.gitlab.gitlab-runner.type=build")
-    - pwd
+  before_script: 
     - ls
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $CYPRESS_IMAGE -f Dockerfile/cypress.Dockerfile .
+    - docker push $CYPRESS_IMAGE
+
+run_tests:
+  extends: .build_docker
+  script:
+    - docker pull $CYPRESS_IMAGE
+    - export CONTAINER_ID=$(docker ps -q -f "label=com.gitlab.gitlab-runner.job.id=$CI_JOB_ID" -f "label=com.gitlab.gitlab-runner.type=build")
     # you can't mount a volume inside a docker for another subdocker, it will mount the host,
     # using --volumes-from and identifying the running docker container will allow us to mount the docker's volume for the subdocker container
-    - docker run --volumes-from $CONTAINER_ID -v $PWD:/e2e $CYPRESS_IMAGE cypress run --config-file /e2e/cypress.json --spec /e2e/test.js
-    - mv cypress/videos/bot-$BOT_ID.js.mp4 cypress/videos/bot-$BOT_ID-$(date +'%Y%m%d-%H%M%S').mp4  
+    - docker run --mount type=bind,source=$(pwd)/videos,target=/app/videos $CYPRESS_IMAGE --config-file cypress.config.js --spec bot-$BOT_ID.js
   artifacts:
     when: always
     paths:
-      - cypress/videos/**/*.mp4
-      - cypress/screenshots/**/*.png
+      - ./videos/*.mp4 
     expire_in: 7 days
   retry: 1
-
-
